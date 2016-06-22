@@ -1,0 +1,4 @@
+o *t  ,*R ; (O -> S'TO', S' -> ε, O' -> SW;, W' -> VW', V -> PT, W' -> S'K, S' -> S, K -> ,S'W, S' -> ε, W' -> VW', V -> PT, W' -> S'K, S' -> S, K -> ε) 
+ e  A ; (O -> S'TO', S' -> S, O' -> SW;, W' -> VW', V -> T, W' -> S'K, S' -> S, K -> ε)
+d*n ,*h  ; (O -> S'TO', S' -> S, O' -> PTW';, W' -> S'K, S' -> S, K -> ,S'W, S' -> ε, W' -> VW', V -> PT, W' -> S'K, S' -> S, K -> ε)
+S  V; (O -> S'TO', S' -> ε, O' -> SW;, W' -> VW', V -> T, W' -> S'K, S' -> ε, K -> ε)
