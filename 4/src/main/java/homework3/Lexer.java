@@ -1,32 +1,30 @@
-package mypackage;
+package homework3;
 
 import java.io.IOException;
 import java.io.InputStream;
 
-public class GrammarLexer {
+public class Lexer {
     enum TokenType {
-        OR(new char[] {'|'}, "|", false),
-        QUOTEDSTRING(new char[] {'\''}, "'.+?'", true),
-        ACTION(new char[] {'{'}, "\\{(?s).+?\\}", true),
-        BRACKETTEDVARS(new char[] {'['}, "\\[(?s).+?\\]", true),
-        COLON(new char[] {':'}, ":", false),
-        SEMICOLON(new char[] {';'}, ";", false),
-        RULENAME(new char[] {'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'}, "[a-z][a-zA-Z0-9]*", true),
-        TOKENNAME(new char[] {'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'}, "[A-Z][a-zA-Z0-9]*", true),
-        DOLLAR(new char[] {'@'}, "@", false),
-        EQUAL(new char[] {'='}, "=", false),
-        LBRACKET(new char[] {'('}, "(", false),
-        RBRACKET(new char[] {')'}, ")", false),
-        PLUS(new char[] {'+'}, "+", false),
-        STAR(new char[] {'*'}, "*", false),
-        QUESTION(new char[] {'?'}, "?", false),
-        POINT(new char[] {'.'}, ".", false),
+        STR_40(new char[] {'('}, "(", false),
+        STR_41(new char[] {')'}, ")", false),
+        STR_42(new char[] {'*'}, "*", false),
+        STR_123(new char[] {'{'}, "{", false),
+        STR_43(new char[] {'+'}, "+", false),
+        STR_125(new char[] {'}'}, "}", false),
+        STR_61(new char[] {'='}, "=", false),
+        STR_45(new char[] {'-'}, "-", false),
+        STR_47(new char[] {'/'}, "/", false),
+        NUM(new char[] {'0','1','2','3','4','5','6','7','8','9'}, "[0-9]+", true),
+        VAR(new char[] {'$'}, "[$]{1}[a-zA-Z_][a-zA-Z0-9_]*", true),
+        PRINT(new char[] {'p'}, "print", true),
+        LACTION(new char[] {'!','<','=','>'}, "(<|>|==|!=|<=|>=)", true),
+        IF(new char[] {'i'}, "if", true),
+        ELSE(new char[] {'e'}, "else", true),
+        SEMICOLON(new char[] {';'}, ";", true),
         END(new char[] {}, "", false);
-
         char[] firstSymbols;
-        boolean isRegex;
         String regex;
-
+        boolean isRegex;
         TokenType(char[] firstSymbols, String regex, boolean isRegex) {
             this.firstSymbols = firstSymbols;
             this.regex = regex;
@@ -47,9 +45,10 @@ public class GrammarLexer {
     InputStream is;
     int curChar;
     int curPos;
+    Token curToken;
     TokenType[] tokenTypes;
 
-    public GrammarLexer(InputStream is) throws IOException {
+    public Lexer(InputStream is) throws IOException {
         this.is = is;
         curPos = 0;
         this.tokenTypes = TokenType.values();
@@ -90,8 +89,7 @@ public class GrammarLexer {
                 }
             }
         }
-        System.out.println(Character.valueOf((char)curChar) + " " + curPos);
-        throw new IOException("token not exists");
+        throw new IOException("unknown token starts with" + (char) curChar);
     }
 
     public void getNextChar() throws IOException {

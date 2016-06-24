@@ -76,7 +76,7 @@ public class Lexer {
                 }
             }
         }
-        throw new IOException("token not exists");
+        throw new IOException("unknown token starts with" + (char) curChar);
     }
 
     public void getNextChar() throws IOException {

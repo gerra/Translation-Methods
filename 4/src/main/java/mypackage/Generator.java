@@ -19,18 +19,17 @@ public class Generator {
         InputStream is = new FileInputStream("test.mg");
         GrammarParser grammarParser = new GrammarParser(is);
         grammarParser.parse();
-        grammarParser.createLexerAndParserFiles("test", "decls");
+        grammarParser.createLexerAndParserFiles("test", "decls", null);
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        if (args.length < 2 || args[0] == null || args[1] == null) {
-            System.err.println("need grammar file and main rule");
+        if (args.length < 3 || args[0] == null || args[1] == null) {
+            System.err.println("need grammar file & main rule & input");
             System.exit(1);
         }
         InputStream is = new FileInputStream(args[0]);
         GrammarParser grammarParser = new GrammarParser(is);
         grammarParser.parse();
-        grammarParser.createLexerAndParserFiles(args[0].split("\\.")[0], args[1]);
-//        test();
+        grammarParser.createLexerAndParserFiles(args[0].split("\\.")[0], args[1], (args[2].isEmpty() ? null : args[2]));
     }
 }

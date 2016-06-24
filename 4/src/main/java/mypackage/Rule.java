@@ -1,7 +1,6 @@
 package mypackage;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class Rule {
 
@@ -101,8 +100,26 @@ public class Rule {
     List<Var> takeList = new ArrayList<>();
     List<Var> returnList = new ArrayList<>();
 
+    private static Map<String, List<Rule>> rulePool = new HashMap<>();
+
     public Rule(String name) {
         this.name = name;
+        List<Rule> rules = rulePool.get(name);
+        if (rules == null) {
+            rules = new ArrayList<>();
+            rulePool.put(name, rules);
+        }
+        rules.add(this);
+    }
+
+    public RuleDescr getEpsRuleDescr() {
+        List<Rule> rules = rulePool.get(name);
+        for (Rule rule : rules) {
+            if (rule.epsRuleDescr != null) {
+                return rule.epsRuleDescr;
+            }
+        }
+        return null;
     }
 
     void addRuleDescr(RuleDescr ruleDescr) {

@@ -1,5 +1,7 @@
 package mypackage;
 
+import sun.text.resources.ro.CollationData_ro;
+
 import java.io.*;
 import java.util.*;
 
@@ -47,7 +49,8 @@ public class GrammarParser {
             String[] takesSplitted = takeList.split(",");
             for (String take : takesSplitted) {
                 String[] var = take.split("[ \r\t\n]+");
-                rule.addTake(new Rule.Var(var[0], var[1]));
+                int len = var.length;
+                rule.addTake(new Rule.Var(var[len-2], var[len-1]));
             }
             token = lexer.processNextToken();
         }
@@ -323,6 +326,55 @@ public class GrammarParser {
         globalSpace = 0;
     }
 
+    void genRuleDescr(Rule.RuleDescr ruleDescr) throws IOException {
+        Rule rule = ruleDescr.parentRule;
+        String ruleResultClass = "RuleResult" + rule.name;
+        parserWriter.write(globalSpace() + "Tree resTree = new Tree(\"" + rule.name + "\");\n\n");
+        parserWriter.write(globalSpace() + ruleResultClass + " res = new " + ruleResultClass + "();\n");
+        parserWriter.write(globalSpace() + "String asText = \"\";\n");
+        int treeInd = 0;
+        for (int ri = 0; ri < ruleDescr.ruleParts.size(); ri++) {
+            Rule.RulePart rulePart = ruleDescr.ruleParts.get(ri);
+            if (rulePart instanceof Rule.RulePartStr) {
+                Rule.RulePartStr partStr = (Rule.RulePartStr) rulePart;
+
+                parserWriter.write(globalSpace() + "Tree tree" + treeInd + " = parse" + "STR_" + partStr.string.hashCode() + "();\n");
+                parserWriter.write(globalSpace() + "resTree.addChild(tree" + treeInd + ");\n\n");
+                parserWriter.write(globalSpace() + "asText += \"" + partStr.string + "\";\n");
+                treeInd++;
+            } else if (rulePart instanceof Rule.RulePartAssignT) {
+                Rule.RulePartAssignT partAssignT = (Rule.RulePartAssignT) rulePart;
+                Token assignedToken = partAssignT.token;
+
+                parserWriter.write(globalSpace() + "TokenRuleResult" + assignedToken.name + " " + partAssignT.name
+                        + " = parse" + assignedToken.name + "();\n");
+                parserWriter.write(globalSpace() + "resTree.addChild(" + partAssignT.name + ".tree);\n\n");
+                parserWriter.write(globalSpace() + "asText += " + partAssignT.name + ".text;\n");
+            } else if (rulePart instanceof Rule.RulePartAssignR) {
+                Rule.RulePartAssignR partAssignR = (Rule.RulePartAssignR) rulePart;
+                Rule assignedRule = partAssignR.rule;
+
+                String callWith = "";
+                for (Rule.Var var : assignedRule.takeList) {
+                    if (var != assignedRule.takeList.get(0)) {
+                        callWith += ", ";
+                    }
+                    callWith += var.name;
+                }
+                callWith = deleteDollars(ruleDescr, ri, callWith);
+
+                parserWriter.write(globalSpace() + "RuleResult" + assignedRule.name + " " + partAssignR.name
+                        + " = parse" + assignedRule.name + "(" + callWith + ");\n");
+                parserWriter.write(globalSpace() + "resTree.addChild(" + partAssignR.name + ".tree);\n");
+                parserWriter.write(globalSpace() + "asText += " + partAssignR.name + ".text;\n");
+            }
+        }
+        parserWriter.write(globalSpace() + deleteDollars(ruleDescr, ruleDescr.ruleParts.size(), ruleDescr.aciton) + "\n");
+        parserWriter.write(globalSpace() + "res.tree = resTree;\n");
+        parserWriter.write(globalSpace() + "res.text = asText;\n");
+        parserWriter.write(globalSpace() + "return res;\n");
+    }
+
     void createParserFile() throws IOException {
         parserWriter.write("package " + packageName + ";\n\n");
         parserWriter.write("import java.io.*;\n" +
@@ -336,7 +388,7 @@ public class GrammarParser {
         globalSpace = 1;
         parserWriter.write(globalSpace() + members + "\n\n");
 
-        parserWriter.write(globalSpace() + "Parser(InputStream is) throws IOException {\n" +
+        parserWriter.write(globalSpace() + "public Parser(InputStream is) throws IOException {\n" +
                 "        lexer = new Lexer(is);\n" +
                 "        token = lexer.processNextToken();\n" +
                 "    }\n");
@@ -384,15 +436,16 @@ public class GrammarParser {
 
         for (Rule rule : rules) {
             String ruleResultClass = "RuleResult" + rule.name;
-            parserWriter.write(globalSpace() + "static class " + ruleResultClass + " {\n");
+            parserWriter.write(globalSpace() + "public static class " + ruleResultClass + " {\n");
             globalSpace++;
             parserWriter.write(globalSpace() + "Tree tree;\n");
             for (Rule.Var var : rule.returnList) {
-                parserWriter.write(globalSpace() + var.type + " " + var.name + ";\n");
+                parserWriter.write(globalSpace() + "public " + var.type + " " + var.name + ";\n");
             }
+            parserWriter.write(globalSpace() + "String text;\n");
             globalSpace--;
             parserWriter.write(globalSpace() + "}\n\n");
-            parserWriter.write(globalSpace() + ruleResultClass + " parse" + rule.name + "(");
+            parserWriter.write(globalSpace() + "public " + ruleResultClass + " parse" + rule.name + "(");
             for (Rule.Var var : rule.takeList) {
                 if (var != rule.takeList.get(0)) {
                     parserWriter.write(", ");
@@ -412,58 +465,30 @@ public class GrammarParser {
                 }
                 parserWriter.write(globalSpace() + "case " + element.t + ": {\n");
                 globalSpace++;
-                parserWriter.write(globalSpace() + "Tree resTree = new Tree(\"" + rule.name + "\");\n\n");
-                parserWriter.write(globalSpace() + ruleResultClass + " res = new " + ruleResultClass + "();\n");
-                int treeInd = 0;
-                for (int ri = 0; ri < ruleDescr.ruleParts.size(); ri++) {
-                    Rule.RulePart rulePart = ruleDescr.ruleParts.get(ri);
-                    if (rulePart instanceof Rule.RulePartStr) {
-                        Rule.RulePartStr partStr = (Rule.RulePartStr) rulePart;
-
-                        parserWriter.write(globalSpace() + "Tree tree" + treeInd + " = parse" + "STR_" + partStr.string.hashCode() + "();\n");
-                        parserWriter.write(globalSpace() + "resTree.addChild(tree" + treeInd + ");\n\n");
-                        treeInd++;
-                    } else if (rulePart instanceof Rule.RulePartAssignT) {
-                        Rule.RulePartAssignT partAssignT = (Rule.RulePartAssignT) rulePart;
-                        Token assignedToken = partAssignT.token;
-
-                        parserWriter.write(globalSpace() + "TokenRuleResult" + assignedToken.name + " " + partAssignT.name
-                                + " = parse" + assignedToken.name + "();\n");
-                        parserWriter.write(globalSpace() + "resTree.addChild(" + partAssignT.name + ".tree);\n\n");
-                    } else if (rulePart instanceof Rule.RulePartAssignR) {
-                        Rule.RulePartAssignR partAssignR = (Rule.RulePartAssignR) rulePart;
-                        Rule assignedRule = partAssignR.rule;
-
-                        String callWith = "";
-                        for (Rule.Var var : assignedRule.takeList) {
-                            if (var != assignedRule.takeList.get(0)) {
-                                callWith += ", ";
-                            }
-                            callWith += var.name;
-                        }
-                        callWith = deleteDollars(ruleDescr, ri, callWith);
-
-                        parserWriter.write(globalSpace() + "RuleResult" + assignedRule.name + " " + partAssignR.name
-                                + " = parse" + assignedRule.name + "(" + callWith + ");\n");
-                        parserWriter.write(globalSpace() + "resTree.addChild(" + partAssignR.name + ".tree);\n");
-                    }
-                }
-                parserWriter.write(globalSpace() + deleteDollars(ruleDescr, ruleDescr.ruleParts.size(), ruleDescr.aciton) + "\n");
-                parserWriter.write(globalSpace() + "res.tree = resTree;\n");
-                parserWriter.write(globalSpace() + "return res;\n");
+                genRuleDescr(ruleDescr);
                 globalSpace--;
                 parserWriter.write(globalSpace() + "}\n");
             }
             parserWriter.write(globalSpace() + "default: {\n");
             globalSpace++;
-            if (rule.epsRuleDescr == null) {
+            if (rule.getEpsRuleDescr() == null) {
                 parserWriter.write(globalSpace() + "throw new IOException(\"unexpected token\");\n");
             } else {
-                Rule.RuleDescr ruleDescr = rule.epsRuleDescr;
-                parserWriter.write(globalSpace() + ruleResultClass + " res = new " + ruleResultClass + "();\n");
-                parserWriter.write(globalSpace() + deleteDollars(ruleDescr, ruleDescr.ruleParts.size(), ruleDescr.aciton) + "\n");
-                parserWriter.write(globalSpace() + "res.tree = new Tree(\"eps\");\n");
-                parserWriter.write(globalSpace() + "return res;\n");
+                Rule.RuleDescr ruleDescr = rule.getEpsRuleDescr();
+
+                while (!ruleDescr.parentRule.name.equals(rule.name)) {
+                    ruleDescr = ruleDescr.parentRule.getEpsRuleDescr();
+                }
+
+                if (ruleDescr.ruleParts.size() == 0) {
+                    parserWriter.write(globalSpace() + ruleResultClass + " res = new " + ruleResultClass + "();\n");
+                    parserWriter.write(globalSpace() + deleteDollars(ruleDescr, ruleDescr.ruleParts.size(), ruleDescr.aciton) + "\n");
+                    parserWriter.write(globalSpace() + "res.tree = new Tree(\"eps\");\n");
+                    parserWriter.write(globalSpace() + "res.text = \"\";\n");
+                    parserWriter.write(globalSpace() + "return res;\n");
+                } else {
+                    genRuleDescr(ruleDescr);
+                }
             }
             globalSpace--;
             parserWriter.write(globalSpace() + "}\n");
@@ -602,9 +627,10 @@ public class GrammarParser {
         return callWith;
     }
 
-    void createMainFile(String mainRule) throws IOException {
+    void createMainFile(String mainRule, String input) throws IOException {
         mainWriter.write("package " + packageName + ";\n\n");
-        mainWriter.write("import java.io.FileInputStream;\n" +
+        mainWriter.write(
+                "import java.io.FileInputStream;\n" +
                 "import java.io.IOException;\n" +
                 "\n" +
                 "public class Main {\n" +
@@ -614,18 +640,19 @@ public class GrammarParser {
                 "            System.exit(1);\n" +
                 "        }\n" +
                 "        Parser parser = new Parser(new FileInputStream(args[0]));\n" +
-                "        parser.parse" + mainRule + "();\n" +
+                "        parser.parse" + mainRule + "("+(input!=null?input:"")+");\n" +
                 "    }\n" +
                 "}\n");
     }
 
-    void createLexerAndParserFiles(String packageName, String mainRule) {
+    void createLexerAndParserFiles(String packageName, String mainRule, String input) {
+        String root = "src/main/java/";
         this.packageName = packageName;
         try {
-            lexerFile = new File(packageName + File.separator + "Lexer.java");
-            parserFile = new File(packageName + File.separator + "Parser.java");
-            treeFile = new File(packageName + File.separator + "Tree.java");
-            mainFile = new File(packageName + File.separator + "Main.java");
+            lexerFile = new File(root + packageName + File.separator + "Lexer.java");
+            parserFile = new File(root + packageName + File.separator + "Parser.java");
+            treeFile = new File(root + packageName + File.separator + "Tree.java");
+            mainFile = new File(root + packageName + File.separator + "Main.java");
             lexerFile.getParentFile().mkdirs();
             lexerFile.createNewFile();
             parserFile.createNewFile();
@@ -642,6 +669,7 @@ public class GrammarParser {
                 followSets.put(rule.name, new FirstFollowSet());
                 ruleDescrs.addAll(rule.ruleDescrs);
             }
+            Collections.reverse(ruleDescrs);
             boolean changed;
             do {
                 changed = false;
@@ -696,10 +724,35 @@ public class GrammarParser {
                 }
             } while (changed);
 
+            do {
+                changed = false;
+                for (Rule rule : rules) {
+                    if (rule.getEpsRuleDescr() == null) {
+                        for (Rule.RuleDescr ruleDescr : rule.ruleDescrs) {
+                            boolean isEps = true;
+                            for (Rule.RulePart rulePart : ruleDescr.ruleParts) {
+                                if (rulePart instanceof Rule.RulePartAssignR) {
+                                    Rule r = ((Rule.RulePartAssignR) rulePart).rule;
+                                    isEps &= r.getEpsRuleDescr() != null;
+                                } else if (rulePart instanceof Rule.RulePartAssignT) {
+                                    isEps = false;
+                                } else if (rulePart instanceof Rule.RulePartStr) {
+                                    isEps = false;
+                                }
+                            }
+                            if (isEps) {
+                                changed = true;
+                                rule.epsRuleDescr = ruleDescr;
+                            }
+                        }
+                    }
+                }
+            } while (changed);
+
             createLexerFile();
             createParserFile();
             createTreeFile();
-            createMainFile(mainRule);
+            createMainFile(mainRule, input);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {

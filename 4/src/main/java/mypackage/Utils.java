@@ -48,6 +48,7 @@ public class Utils {
     }
 
     public static List<Character> getFirstCharsOfRegex(String regex) {
+//        System.out.println(Pattern.quote(regex));
         Pattern pattern = Pattern.compile(regex);
         List<Character> res = new ArrayList<>();
         for (char c = 0; c < 256; c++) {
@@ -63,8 +64,11 @@ public class Utils {
         StringBuilder resBuilder = new StringBuilder();
         for (char c : characters) {
             resBuilder
-                    .append('\'')
-                    .append(c)
+                    .append('\'');
+            if (c == '*' || c == '/' || c == '{' || c == '}' || c == '+') {
+                resBuilder.append('\\');
+            }
+            resBuilder.append(c)
                     .append('\'')
                     .append(',');
         }
